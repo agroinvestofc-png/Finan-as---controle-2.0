@@ -1,0 +1,7 @@
+# Arquivos a ignorar no Vercel
+.git
+.gitignore
+node_modules
+.env.local
+.env.*.local
+*.md
