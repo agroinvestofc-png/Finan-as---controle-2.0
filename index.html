@@ -1458,7 +1458,6 @@
   // ====== GOOGLE AUTH ======
   async function initGapi() {
     try {
-      // Tenta inicializar com ambas as APIs
       await gapi.client.init({
         apiKey: API_KEY,
         discoveryDocs: DISCOVERY_DOCS,
@@ -1466,18 +1465,16 @@
       gapiInited = true;
       console.log('GAPI: Sheets e Drive inicializados.');
     } catch (err) {
-      console.warn('Erro ao carregar Drive API, tentando apenas Sheets API...', err);
+      console.warn('Erro ao carregar APIs, tentando fallback...', err);
       try {
-        // Fallback: Tenta apenas com Sheets API se a Drive API falhar (ex: 403 Forbidden)
         await gapi.client.init({
           apiKey: API_KEY,
-          discoveryDocs: [DISCOVERY_DOCS[0]], // Apenas Sheets
+          discoveryDocs: [DISCOVERY_DOCS[0]],
         });
         gapiInited = true;
-        console.log('GAPI: Apenas Sheets inicializado (Drive API indisponível).');
       } catch (err2) {
         console.error('Erro fatal ao inicializar GAPI:', err2);
-        document.getElementById('loginStatus').textContent = '⚠️ Erro ao conectar ao Google. Verifique se a Sheets API está ativa no Google Cloud.';
+        document.getElementById('loginStatus').textContent = '⚠️ Erro ao conectar ao Google.';
       }
     }
     if (gapiInited) maybeEnableButtons();
@@ -1488,10 +1485,11 @@
       tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: CLIENT_ID,
         scope: SCOPES,
+        ux_mode: 'popup',
         callback: async (resp) => {
           if (resp.error) {
             console.error('Erro de autenticação:', resp);
-            document.getElementById('loginStatus').textContent = '❌ ' + (resp.error_description || 'Erro ao autenticar. Tente novamente.');
+            document.getElementById('loginStatus').textContent = '❌ ' + (resp.error_description || 'Erro ao autenticar.');
             return;
           }
           isSignedIn = true;
@@ -1502,10 +1500,9 @@
           
           spreadsheetId = localStorage.getItem('financas_spreadsheet_id');
           
-          // Se não houver ID local, tenta buscar no Drive pelo nome (permite acessar de outras máquinas)
           if (!spreadsheetId && gapi.client.drive) {
             try {
-              setSyncStatus('loading', 'Buscando planilha existente no Google Drive...');
+              setSyncStatus('loading', 'Buscando planilha no Drive...');
               const response = await gapi.client.drive.files.list({
                 q: "name = 'Finanças Controle - Dados' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false",
                 fields: 'files(id, name)',
@@ -1515,35 +1512,26 @@
               if (files && files.length > 0) {
                 spreadsheetId = files[0].id;
                 localStorage.setItem('financas_spreadsheet_id', spreadsheetId);
-                console.log('Planilha encontrada no Drive:', spreadsheetId);
               }
-            } catch (err) {
-              console.error('Erro ao buscar planilha no Drive:', err);
-            }
-          } else if (!spreadsheetId && !gapi.client.drive) {
-            console.warn('Drive API não carregada. A busca automática de planilhas existentes não funcionará.');
+            } catch (err) { console.error('Erro Drive:', err); }
           }
 
           if (spreadsheetId) {
             await loadFromSheets();
           } else {
             try {
-              setSyncStatus('loading', 'Criando nova planilha no Google Drive...');
+              setSyncStatus('loading', 'Criando planilha...');
               const createResp = await gapi.client.sheets.spreadsheets.create({
                 properties: { title: 'Finanças Controle - Dados' }
               });
               spreadsheetId = createResp.result.spreadsheetId;
               localStorage.setItem('financas_spreadsheet_id', spreadsheetId);
-              // Salva dados iniciais
               await syncToSheets();
             } catch(e) {
-              console.error('Erro ao criar planilha:', e);
-              setSyncStatus('error', 'Erro ao criar planilha: ' + (e.message || ''));
-              // Fallback para local
+              console.error('Erro ao criar:', e);
+              setSyncStatus('error', 'Erro ao criar planilha.');
               useCloud = false;
-              if (!loadFromLocalStorage()) {
-                initDefaultData();
-              }
+              if (!loadFromLocalStorage()) initDefaultData();
               renderAll();
             }
           }
@@ -1553,8 +1541,8 @@
       gisInited = true;
       maybeEnableButtons();
     } catch(e) {
-      console.error('Erro ao inicializar GIS:', e);
-      document.getElementById('loginStatus').textContent = '⚠️ Erro ao carregar autenticação. Use o modo local.';
+      console.error('Erro GIS:', e);
+      document.getElementById('loginStatus').textContent = '⚠️ Erro ao carregar autenticação.';
     }
   }
 
