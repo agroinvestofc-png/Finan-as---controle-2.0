@@ -1456,17 +1456,31 @@
   });
 
   // ====== GOOGLE AUTH ======
-  function initGapi() {
-    gapi.client.init({
-      apiKey: API_KEY,
-      discoveryDocs: DISCOVERY_DOCS,
-    }).then(() => {
+  async function initGapi() {
+    try {
+      // Tenta inicializar com ambas as APIs
+      await gapi.client.init({
+        apiKey: API_KEY,
+        discoveryDocs: DISCOVERY_DOCS,
+      });
       gapiInited = true;
-      maybeEnableButtons();
-    }).catch(err => {
-      console.error('Erro ao inicializar GAPI:', err);
-      document.getElementById('loginStatus').textContent = '⚠️ Erro ao conectar ao Google. Clique em "Usar apenas local" ou recarregue.';
-    });
+      console.log('GAPI: Sheets e Drive inicializados.');
+    } catch (err) {
+      console.warn('Erro ao carregar Drive API, tentando apenas Sheets API...', err);
+      try {
+        // Fallback: Tenta apenas com Sheets API se a Drive API falhar (ex: 403 Forbidden)
+        await gapi.client.init({
+          apiKey: API_KEY,
+          discoveryDocs: [DISCOVERY_DOCS[0]], // Apenas Sheets
+        });
+        gapiInited = true;
+        console.log('GAPI: Apenas Sheets inicializado (Drive API indisponível).');
+      } catch (err2) {
+        console.error('Erro fatal ao inicializar GAPI:', err2);
+        document.getElementById('loginStatus').textContent = '⚠️ Erro ao conectar ao Google. Verifique se a Sheets API está ativa no Google Cloud.';
+      }
+    }
+    if (gapiInited) maybeEnableButtons();
   }
 
   function initGis() {
@@ -1489,7 +1503,7 @@
           spreadsheetId = localStorage.getItem('financas_spreadsheet_id');
           
           // Se não houver ID local, tenta buscar no Drive pelo nome (permite acessar de outras máquinas)
-          if (!spreadsheetId) {
+          if (!spreadsheetId && gapi.client.drive) {
             try {
               setSyncStatus('loading', 'Buscando planilha existente no Google Drive...');
               const response = await gapi.client.drive.files.list({
@@ -1506,6 +1520,8 @@
             } catch (err) {
               console.error('Erro ao buscar planilha no Drive:', err);
             }
+          } else if (!spreadsheetId && !gapi.client.drive) {
+            console.warn('Drive API não carregada. A busca automática de planilhas existentes não funcionará.');
           }
 
           if (spreadsheetId) {
