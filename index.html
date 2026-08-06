@@ -1389,9 +1389,18 @@
       useCloud = false;
       document.getElementById('loginOverlay').style.display = 'flex';
       document.getElementById('app').style.display = 'none';
+      
+      // Limpa dados de sessão
       localStorage.removeItem('financas_spreadsheet_id');
+      localStorage.removeItem('financas_google_token');
+      localStorage.removeItem('financas_google_token_expiry');
+      
       if (tokenClient) {
-        try { tokenClient.revoke(); } catch(e) {}
+        try { 
+          // Revoga o token no Google
+          const token = gapi.client.getToken();
+          if (token) google.accounts.oauth2.revoke(token.access_token);
+        } catch(e) {}
       }
     }
   });
@@ -1492,6 +1501,13 @@
             document.getElementById('loginStatus').textContent = '❌ ' + (resp.error_description || 'Erro ao autenticar.');
             return;
           }
+          
+          // Salva o token para persistência (expira em 1h por padrão no Google)
+          if (resp.access_token) {
+            localStorage.setItem('financas_google_token', resp.access_token);
+            localStorage.setItem('financas_google_token_expiry', Date.now() + (resp.expires_in * 1000));
+          }
+
           isSignedIn = true;
           useCloud = true;
           document.getElementById('loginOverlay').style.display = 'none';
@@ -1603,16 +1619,40 @@
 
   // Inicializa GIS
   window.onload = function() {
-    // Verifica se já está autenticado via localStorage
+    // Tenta recuperar sessão existente
+    const savedToken = localStorage.getItem('financas_google_token');
+    const tokenExpiry = localStorage.getItem('financas_google_token_expiry');
     const savedId = localStorage.getItem('financas_spreadsheet_id');
-    if (savedId) {
-      // Tenta carregar dados locais primeiro
+
+    if (savedToken && tokenExpiry && Date.now() < parseInt(tokenExpiry)) {
+      // Sessão ainda válida!
+      console.log('Sessão persistente encontrada.');
+      
+      // Aguarda o GAPI inicializar para configurar o token
+      const checkGapi = setInterval(async () => {
+        if (gapiInited) {
+          clearInterval(checkGapi);
+          gapi.client.setToken({ access_token: savedToken });
+          
+          isSignedIn = true;
+          useCloud = true;
+          document.getElementById('loginOverlay').style.display = 'none';
+          document.getElementById('app').style.display = 'block';
+          
+          if (savedId) {
+            spreadsheetId = savedId;
+            await loadFromSheets();
+          }
+          setSyncStatus('synced', 'Sessão restaurada!');
+        }
+      }, 100);
+    } else if (savedId) {
+      // Sessão expirada ou não existe, mas temos dados locais
       if (loadFromLocalStorage()) {
-        // Mostra opção de reconectar
-        document.getElementById('loginStatus').innerHTML = '🔄 Dados locais encontrados. <button class="btn btn-google btn-sm" style="padding:0.2rem 1rem;height:auto;font-size:0.75rem;" id="reconnectBtn">Reconectar</button>';
+        document.getElementById('loginStatus').innerHTML = '🔄 Sessão expirada. <button class="btn btn-google btn-sm" style="padding:0.2rem 1rem;height:auto;font-size:0.75rem;" id="reconnectBtn">Reconectar</button>';
         document.getElementById('reconnectBtn')?.addEventListener('click', function() {
           if (tokenClient) {
-            try { tokenClient.requestAccessToken({ prompt: 'consent' }); } catch(e) {}
+            try { tokenClient.requestAccessToken({ prompt: '' }); } catch(e) {}
           }
         });
       }
