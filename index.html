@@ -3391,7 +3391,6 @@
           useCloud = false;
           document.getElementById('loginOverlay').style.display = 'flex';
           document.getElementById('app').style.display = 'none';
-          localStorage.removeItem('financas_spreadsheet_id');
           if (tokenClient) { try { tokenClient.revoke(); } catch (e) {} }
           showToast('Desconectado', 'info');
         }
