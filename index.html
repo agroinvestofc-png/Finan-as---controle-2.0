@@ -1513,7 +1513,6 @@
 
   <!-- GOOGLE APIS -->
   <script src="https://accounts.google.com/gsi/client"></script>
-  <script src="https://apis.google.com/js/api.js"></script>
 
   <script>
     (function() {
@@ -3550,15 +3549,15 @@
             callback: async (resp) => {
               if (resp.error) {
                 console.error('Auth error:', resp);
-                document.getElementById('loginStatus').textContent = '❌ ' + (
-                  resp.error_description || 'Erro ao autenticar.'
-                );
+                document.getElementById('loginStatus').textContent =
+                  '❌ ' + (resp.error_description || 'Erro ao autenticar.');
                 return;
               }
 
-              // Obrigatório: vincula o token OAuth ao cliente da Google Sheets API
-              if (!resp.access_token) {
-                throw new Error('Token OAuth não recebido.');
+              if (!gapiInited || !gapi.client) {
+                document.getElementById('loginStatus').textContent =
+                  '⏳ A API do Google ainda está carregando. Tente novamente.';
+                return;
               }
 
               gapi.client.setToken({
@@ -3601,6 +3600,15 @@
       function maybeEnableButtons() {
         if (gapiInited && gisInited) document.getElementById('googleLoginBtn').disabled = false;
       }
+
+      const gapiScript = document.createElement('script' );
+      gapiScript.src = 'https://apis.google.com/js/api.js';
+      gapiScript.async = true;
+      gapiScript.defer = true;
+      gapiScript.onload = ( ) => {
+        gapi.load('client', initGapi);
+      };
+      document.head.appendChild(gapiScript);
 
       function handleAuthClick() {
         if (!isSignedIn) {
