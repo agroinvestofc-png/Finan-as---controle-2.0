@@ -3550,10 +3550,20 @@
             callback: async (resp) => {
               if (resp.error) {
                 console.error('Auth error:', resp);
-                document.getElementById('loginStatus').textContent = '❌ ' + (resp.error_description ||
-                  'Erro ao autenticar.');
+                document.getElementById('loginStatus').textContent = '❌ ' + (
+                  resp.error_description || 'Erro ao autenticar.'
+                );
                 return;
               }
+
+              // Obrigatório: vincula o token OAuth ao cliente da Google Sheets API
+              if (!resp.access_token) {
+                throw new Error('Token OAuth não recebido.');
+              }
+
+              gapi.client.setToken({
+                access_token: resp.access_token
+              });
               isSignedIn = true;
               useCloud = true;
               document.getElementById('loginOverlay').style.display = 'none';
@@ -3601,10 +3611,6 @@
       document.getElementById('googleLoginBtn').addEventListener('click', handleAuthClick);
       document.getElementById('configUrl').textContent = window.location.origin;
 
-      const gapiScript = document.createElement('script');
-      gapiScript.src = 'https://apis.google.com/js/api.js';
-      gapiScript.onload = () => { gapi.load('client', initGapi); };
-      document.head.appendChild(gapiScript);
 
       // ─── Botão CSV ───
       const toolbar = document.querySelector('#tab1 .toolbar');
