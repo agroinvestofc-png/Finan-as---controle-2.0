@@ -1524,8 +1524,15 @@
       // ════════════════════════════════════════════════════
       const CLIENT_ID = '324033334631-l3seledv6q461le5s80rd172g6kphbte.apps.googleusercontent.com';
       const API_KEY = 'AIzaSyC9YN8bsIvvbb4_EnJqR0xqT6Wpv_jLpOI';
-      const DISCOVERY_DOC = 'https://sheets.googleapis.com/$discovery/rest?version=v4';
-      const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
+      const DISCOVERY_DOC =
+        'https://sheets.googleapis.com/$discovery/rest?version=v4';
+      const DRIVE_DISCOVERY_DOC =
+        'https://www.googleapis.com/$discovery/rest?version=v3';
+      const SCOPES = [
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/drive.metadata.readonly'
+      ].join(' ' );
+
 
       // ════════════════════════════════════════════════════
       // ESTADO
@@ -3534,11 +3541,31 @@
       // GOOGLE AUTH
       // ════════════════════════════════════════════════════
       function initGapi() {
-        gapi.client.init({ apiKey: API_KEY, discoveryDocs: [DISCOVERY_DOC] })
-          .then(() => { gapiInited = true;
-            maybeEnableButtons(); })
-          .catch(err => { console.error('GAPI init error:', err);
-            document.getElementById('loginStatus').textContent = '⚠️ Erro ao conectar ao Google.'; });
+        gapi.client.init({
+          apiKey: API_KEY,
+          discoveryDocs: [DISCOVERY_DOC, DRIVE_DISCOVERY_DOC]
+        }).then(() => {
+          gapiInited = true;
+          maybeEnableButtons();
+        }).catch(err => {
+          console.error('GAPI init error:', err);
+          document.getElementById('loginStatus').textContent =
+            '⚠️ Erro ao conectar ao Google.';
+        });
+      }
+
+      async function findSpreadsheetInDrive() {
+        const response = await gapi.client.drive.files.list({
+          q: "name = 'Finanças Controle - Dados' " +
+            "and mimeType = 'application/vnd.google-apps.spreadsheet' " +
+            "and trashed = false",
+          spaces: 'drive',
+          fields: 'files(id,name,modifiedTime)',
+          orderBy: 'modifiedTime desc',
+          pageSize: 1
+        });
+
+        return response.result.files?.[0]?.id || null;
       }
 
       function initGis() {
@@ -3569,8 +3596,22 @@
               document.getElementById('app').style.display = 'block';
               setSyncStatus('loading', 'Conectado, carregando...');
               spreadsheetId = localStorage.getItem('financas_spreadsheet_id');
-              if (spreadsheetId) {
-                await loadFromSheets();
+              if (!spreadsheetId) {
+                spreadsheetId = await findSpreadsheetInDrive();
+              }
+
+              if (!spreadsheetId) {
+                const cr = await gapi.client.sheets.spreadsheets.create({
+                  properties: { title: 'Finanças Controle - Dados' }
+                });
+                spreadsheetId = cr.result.spreadsheetId;
+              }
+
+              localStorage.setItem('financas_spreadsheet_id', spreadsheetId);
+
+              const loaded = await loadFromSheets();
+              if (!loaded) {
+                throw new Error('Não foi possível carregar os dados da planilha.');
               } else {
                 try {
                   const cr = await gapi.client.sheets.spreadsheets.create({ properties: { title: 'Finanças Controle - Dados' } });
