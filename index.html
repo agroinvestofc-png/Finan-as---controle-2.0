@@ -3538,6 +3538,12 @@
       // ════════════════════════════════════════════════════
       // GOOGLE AUTH
       // ════════════════════════════════════════════════════
+      function setLoginStatus(message) {
+        const element = document.getElementById('loginStatus');
+        if (element) element.textContent = message;
+      }
+
+
       function initGapi() {
         gapi.client.init({
           apiKey: API_KEY,
@@ -3547,8 +3553,7 @@
           maybeEnableButtons();
         }).catch(err => {
           console.error('GAPI init error:', err);
-          document.getElementById('loginStatus').textContent =
-            '⚠️ Erro ao conectar ao Google.';
+          setLoginStatus('⚠️ Erro ao conectar ao Google.');
         });
       }
 
@@ -3574,14 +3579,16 @@
             callback: async (resp) => {
               if (resp.error) {
                 console.error('Auth error:', resp);
-                document.getElementById('loginStatus').textContent =
-                  '❌ ' + (resp.error_description || 'Erro ao autenticar.');
+                setLoginStatus(
+                  '❌ ' + (resp.error_description || 'Erro ao autenticar.')
+                );
                 return;
               }
 
               if (!gapiInited || !gapi.client) {
-                document.getElementById('loginStatus').textContent =
-                  '⏳ A API do Google ainda está carregando. Tente novamente.';
+                setLoginStatus(
+                  '⏳ A API do Google ainda está carregando. Tente novamente.'
+                );
                 return;
               }
 
@@ -3634,16 +3641,22 @@
           maybeEnableButtons();
         } catch (e) {
           console.error('GIS init error:', e);
-          document.getElementById('loginStatus').textContent = '⚠️ Erro ao carregar autenticação.';
+          setLoginStatus('⚠️ Erro ao carregar autenticação.');
         }
       }
 
+      function setLoginStatus(message) {
+        const element = document.getElementById('loginStatus');
+        if (element) element.textContent = message;
+      }
+
       function maybeEnableButtons() {
-        if (!gapiInited || !gisInited) return;
+        const loginButton = document.getElementById('googleLoginBtn');
 
-        document.getElementById('googleLoginBtn').disabled = false;
+        if (!gapiInited || !gisInited || !tokenClient) return;
 
-        // Após atualizar a página, renova o token sem abrir o popup novamente
+        if (loginButton) loginButton.disabled = false;
+
         if (
           !sessionRestoreStarted &&
           !isSignedIn &&
@@ -3651,12 +3664,18 @@
         ) {
           sessionRestoreStarted = true;
 
-          try {
-            tokenClient.requestAccessToken({ prompt: '' });
-          } catch (e) {
-            console.error('Erro ao restaurar sessão:', e);
-            localStorage.removeItem(SESSION_KEY);
-          }
+          // Aguarda o ciclo atual terminar para garantir que o tokenClient esteja pronto
+          setTimeout(() => {
+            if (!tokenClient || isSignedIn) return;
+
+            try {
+              tokenClient.requestAccessToken({ prompt: '' });
+            } catch (error) {
+              console.error('Erro ao restaurar sessão:', error);
+              localStorage.removeItem(SESSION_KEY);
+              setLoginStatus('Faça login novamente com o Google.');
+            }
+          }, 0);
         }
       }
 
@@ -3670,11 +3689,24 @@
       document.head.appendChild(gapiScript);
 
       function handleAuthClick() {
-        if (!isSignedIn) {
-          try { tokenClient.requestAccessToken({ prompt: 'consent' }); } catch (e) {
-            document.getElementById('loginStatus').textContent = '❌ ' + (e.message || ''); }
+        if (isSignedIn) return;
+
+        if (!tokenClient) {
+          setLoginStatus(
+            'A autenticação ainda está carregando. Tente novamente.'
+          );
+          return;
+        }
+
+        try {
+          tokenClient.requestAccessToken({ prompt: 'consent' });
+        } catch (e) {
+          console.error('Erro ao iniciar login:', e);
+          setLoginStatus('❌ ' + (e.message || 'Erro ao iniciar login.'));
         }
       }
+
+
       document.getElementById('googleLoginBtn').addEventListener('click', handleAuthClick);
       document.getElementById('configUrl').textContent = window.location.origin;
 
