@@ -1028,17 +1028,6 @@
     <div class="login-box">
       <h2><i class="fas fa-google"></i> Finanças · Controle</h2>
       <p>Conecte-se com sua conta Google para sincronizar seus dados entre todos os dispositivos.</p>
-      <div class="config-card">
-        <strong>⚙️ Configuração</strong>
-        <p style="margin-top:0.3rem;font-size:0.7rem;">
-          1. Crie um projeto no <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a><br />
-          2. Ative a <strong>Google Sheets API</strong><br />
-          3. Crie credenciais OAuth 2.0 (Web application)<br />
-          4. Adicione esta URL em <strong>Authorized JavaScript origins</strong>:<br />
-          <code id="configUrl">https://seu-dominio.com</code><br />
-          5. Substitua as credenciais no código (linhas ~1.200)
-        </p>
-      </div>
       <button class="btn btn-google" id="googleLoginBtn">
         <i class="fab fa-google"></i> Entrar com Google
       </button>
@@ -1522,6 +1511,7 @@
       // ════════════════════════════════════════════════════
       // CONFIGURAÇÃO
       // ════════════════════════════════════════════════════
+      const SESSION_KEY = 'financas_google_session';
       const CLIENT_ID = '324033334631-l3seledv6q461le5s80rd172g6kphbte.apps.googleusercontent.com';
       const API_KEY = 'AIzaSyC9YN8bsIvvbb4_EnJqR0xqT6Wpv_jLpOI';
       const DISCOVERY_DOC =
@@ -1538,6 +1528,7 @@
       // ESTADO
       // ════════════════════════════════════════════════════
       let tokenClient = null;
+      let sessionRestoreStarted = false;
       let gapiInited = false;
       let gisInited = false;
       let isSignedIn = false;
@@ -3396,9 +3387,16 @@
         if (confirm('Desconectar? Seus dados permanecem salvos.')) {
           isSignedIn = false;
           useCloud = false;
+
+          localStorage.removeItem(SESSION_KEY);
+
           document.getElementById('loginOverlay').style.display = 'flex';
           document.getElementById('app').style.display = 'none';
-          if (tokenClient) { try { tokenClient.revoke(); } catch (e) {} }
+
+          if (tokenClient) {
+            try { tokenClient.revoke(); } catch (e) {}
+          }
+
           showToast('Desconectado', 'info');
         }
       });
@@ -3590,6 +3588,8 @@
               gapi.client.setToken({
                 access_token: resp.access_token
               });
+
+              localStorage.setItem(SESSION_KEY, '1');
               isSignedIn = true;
               useCloud = true;
               document.getElementById('loginOverlay').style.display = 'none';
@@ -3639,7 +3639,25 @@
       }
 
       function maybeEnableButtons() {
-        if (gapiInited && gisInited) document.getElementById('googleLoginBtn').disabled = false;
+        if (!gapiInited || !gisInited) return;
+
+        document.getElementById('googleLoginBtn').disabled = false;
+
+        // Após atualizar a página, renova o token sem abrir o popup novamente
+        if (
+          !sessionRestoreStarted &&
+          !isSignedIn &&
+          localStorage.getItem(SESSION_KEY) === '1'
+        ) {
+          sessionRestoreStarted = true;
+
+          try {
+            tokenClient.requestAccessToken({ prompt: '' });
+          } catch (e) {
+            console.error('Erro ao restaurar sessão:', e);
+            localStorage.removeItem(SESSION_KEY);
+          }
+        }
       }
 
       const gapiScript = document.createElement('script' );
