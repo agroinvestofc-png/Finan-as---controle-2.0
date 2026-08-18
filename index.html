@@ -3572,6 +3572,13 @@
       }
 
       function initGis() {
+        if (tokenClient) return;
+
+        if (!window.google?.accounts?.oauth2?.initTokenClient) {
+          setLoginStatus('A autenticação do Google ainda está carregando.');
+          return;
+        }
+
         try {
           tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: CLIENT_ID,
@@ -3674,6 +3681,12 @@
       function handleAuthClick() {
         if (isSignedIn) return;
 
+        // Inicializa sob demanda caso o script do Google ainda não tenha
+        // concluído quando o usuário clicar no botão.
+        if (!tokenClient && window.google?.accounts?.oauth2?.initTokenClient) {
+          initGis();
+        }
+
         if (!tokenClient) {
           setLoginStatus(
             'A autenticação ainda está carregando. Tente novamente.'
@@ -3717,15 +3730,20 @@
             if (tokenClient) { try { tokenClient.requestAccessToken({ prompt: 'consent' }); } catch (e) {} }
           });
         }
-        if (typeof google !== 'undefined' && google.accounts) {
+        const oauthReady = () =>
+          !!window.google?.accounts?.oauth2?.initTokenClient;
+
+        if (oauthReady()) {
           initGis();
         } else {
           const check = setInterval(() => {
-            if (typeof google !== 'undefined' && google.accounts) {
+            if (oauthReady()) {
               clearInterval(check);
               initGis();
             }
-          }, 500);
+          }, 250);
+
+          setTimeout(() => clearInterval(check), 15000);
         }
         loadLocal();
         if (localStorage.getItem('financas_dark') !== null) {
