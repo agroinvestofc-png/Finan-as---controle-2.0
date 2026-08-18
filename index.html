@@ -3,6 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5" />
+  <script>
+    // Evita mostrar a tela de login durante o refresh quando já existe uma sessão.
+    if (localStorage.getItem('financas_google_session') === '1') {
+      document.documentElement.classList.add('has-google-session');
+    }
+  </script>
+  <style>
+    html.has-google-session #loginOverlay { display: none !important; }
+    html.has-google-session #app { display: block !important; }
+  </style>
   <title>Finanças · Controle Total</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -3389,6 +3399,7 @@
           useCloud = false;
 
           localStorage.removeItem(SESSION_KEY);
+          document.documentElement.classList.remove('has-google-session');
 
           document.getElementById('loginOverlay').style.display = 'flex';
           document.getElementById('app').style.display = 'none';
