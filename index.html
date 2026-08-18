@@ -3599,6 +3599,14 @@
                 console.error('Auth error:', resp);
                 isSignedIn = false;
                 useCloud = false;
+
+                // Falha na renovação silenciosa não deve esconder os dados locais.
+                if (sessionRestoreStarted) {
+                  setSyncStatus('synced', 'Dados locais carregados');
+                  setLoginStatus('A nuvem está desconectada; os dados locais continuam disponíveis.');
+                  return;
+                }
+
                 document.getElementById('loginOverlay').style.display = 'flex';
                 document.getElementById('app').style.display = 'none';
                 setLoginStatus(
@@ -3741,10 +3749,16 @@
         if (hasSession) {
           document.getElementById('loginOverlay').style.display = 'none';
           document.getElementById('app').style.display = 'block';
-          setSyncStatus('loading', 'Restaurando sessão...');
         }
 
-        if (savedId && loadLocal()) {
+        // Renderiza o cache imediatamente; a nuvem será carregada depois que o token chegar.
+        const hasLocalData = loadLocal();
+        if (hasLocalData) {
+          renderAll();
+          setSyncStatus('synced', 'Dados locais carregados');
+        }
+
+        if (savedId && hasLocalData) {
           const statusElement = document.getElementById('loginStatus');
           if (statusElement) {
             statusElement.innerHTML =
@@ -3769,7 +3783,6 @@
 
           setTimeout(() => clearInterval(check), 15000);
         }
-        loadLocal();
         if (localStorage.getItem('financas_dark') !== null) {
           darkMode = localStorage.getItem('financas_dark') === 'true';
           applyDark(darkMode);
