@@ -3618,20 +3618,8 @@
 
               const loaded = await loadFromSheets();
               if (!loaded) {
+                setSyncStatus('error', 'Erro ao carregar dados da nuvem.');
                 throw new Error('Não foi possível carregar os dados da planilha.');
-              } else {
-                try {
-                  const cr = await gapi.client.sheets.spreadsheets.create({ properties: { title: 'Finanças Controle - Dados' } });
-                  spreadsheetId = cr.result.spreadsheetId;
-                  localStorage.setItem('financas_spreadsheet_id', spreadsheetId);
-                  await syncToSheets();
-                } catch (e) {
-                  console.error('Erro criar planilha:', e);
-                  setSyncStatus('error', 'Erro ao criar planilha');
-                  useCloud = false;
-                  if (!loadLocal()) initDefaultData();
-                  renderAll();
-                }
               }
               setSyncStatus('synced', 'Pronto!');
               showToast('Conectado ao Google!', 'success');
@@ -3643,11 +3631,6 @@
           console.error('GIS init error:', e);
           setLoginStatus('⚠️ Erro ao carregar autenticação.');
         }
-      }
-
-      function setLoginStatus(message) {
-        const element = document.getElementById('loginStatus');
-        if (element) element.textContent = message;
       }
 
       function maybeEnableButtons() {
@@ -3725,8 +3708,11 @@
       window.onload = function() {
         const savedId = localStorage.getItem('financas_spreadsheet_id');
         if (savedId && loadLocal()) {
-          document.getElementById('loginStatus').innerHTML =
-            '🔄 Dados locais encontrados. <button class="btn btn-google btn-sm" style="padding:0.2rem 1rem;height:auto;font-size:0.7rem;" id="reconnectBtn">Reconectar</button>';
+          const statusElement = document.getElementById('loginStatus');
+          if (statusElement) {
+            statusElement.innerHTML =
+              '🔄 Dados locais encontrados. <button class="btn btn-google btn-sm" style="padding:0.2rem 1rem;height:auto;font-size:0.7rem;" id="reconnectBtn">Reconectar</button>';
+          }
           document.getElementById('reconnectBtn')?.addEventListener('click', function() {
             if (tokenClient) { try { tokenClient.requestAccessToken({ prompt: 'consent' }); } catch (e) {} }
           });
