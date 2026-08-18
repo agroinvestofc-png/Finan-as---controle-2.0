@@ -3586,8 +3586,12 @@
             callback: async (resp) => {
               if (resp.error) {
                 console.error('Auth error:', resp);
+                isSignedIn = false;
+                useCloud = false;
+                document.getElementById('loginOverlay').style.display = 'flex';
+                document.getElementById('app').style.display = 'none';
                 setLoginStatus(
-                  '❌ ' + (resp.error_description || 'Erro ao autenticar.')
+                  '❌ Sessão expirada. Clique em Entrar com Google para reconectar.'
                 );
                 return;
               }
@@ -3720,6 +3724,15 @@
       // ─── Inicialização ───
       window.onload = function() {
         const savedId = localStorage.getItem('financas_spreadsheet_id');
+        const hasSession = localStorage.getItem(SESSION_KEY) === '1';
+
+        // Evita mostrar a tela de login durante a renovação silenciosa do token.
+        if (hasSession) {
+          document.getElementById('loginOverlay').style.display = 'none';
+          document.getElementById('app').style.display = 'block';
+          setSyncStatus('loading', 'Restaurando sessão...');
+        }
+
         if (savedId && loadLocal()) {
           const statusElement = document.getElementById('loginStatus');
           if (statusElement) {
