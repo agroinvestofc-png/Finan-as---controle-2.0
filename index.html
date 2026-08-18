@@ -1689,7 +1689,12 @@
         if (!useCloud || !isSignedIn || !spreadsheetId) return false;
         setSyncStatus('loading', 'Carregando...');
         try {
-          const resp = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId, range: 'A1' });
+          const resp = await withTimeout(
+            gapi.client.sheets.spreadsheets.values.get({
+              spreadsheetId,
+              range: 'A1'
+            })
+          );
           const rows = resp.result.values;
           if (rows && rows.length && rows[0].length) {
             const data = JSON.parse(rows[0][0]);
@@ -3568,8 +3573,20 @@
         });
       }
 
+      function withTimeout(promise, milliseconds = 12000) {
+        let timer;
+        const timeout = new Promise((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error('Tempo limite de comunicação com o Google excedido.')),
+            milliseconds
+          );
+        });
+
+        return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+      }
+
       async function findSpreadsheetInDrive() {
-        const response = await gapi.client.drive.files.list({
+        const response = await withTimeout(gapi.client.drive.files.list({
           q: "name = 'Finanças Controle - Dados' " +
             "and mimeType = 'application/vnd.google-apps.spreadsheet' " +
             "and trashed = false",
@@ -3577,7 +3594,7 @@
           fields: 'files(id,name,modifiedTime)',
           orderBy: 'modifiedTime desc',
           pageSize: 1
-        });
+        }));
 
         return response.result.files?.[0]?.id || null;
       }
@@ -3646,12 +3663,19 @@
 
               localStorage.setItem('financas_spreadsheet_id', spreadsheetId);
 
-              const loaded = await loadFromSheets();
-              if (!loaded) {
-                setSyncStatus('error', 'Erro ao carregar dados da nuvem.');
-                throw new Error('Não foi possível carregar os dados da planilha.');
+              let loaded = false;
+              try {
+                loaded = await withTimeout(loadFromSheets(), 15000);
+              } catch (error) {
+                console.error('Erro ao restaurar dados da nuvem:', error);
               }
-              setSyncStatus('synced', 'Pronto!');
+
+              if (!loaded) {
+                // Mantém os dados locais e encerra o estado de carregamento.
+                setSyncStatus('synced', 'Dados locais carregados');
+              } else {
+                setSyncStatus('synced', 'Pronto!');
+              }
               showToast('Conectado ao Google!', 'success');
             }
           });
