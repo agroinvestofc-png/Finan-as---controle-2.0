@@ -1645,10 +1645,24 @@
       function setSyncStatus(status, msg) {
         const el = document.getElementById('syncStatus');
         const text = document.getElementById('syncText');
+
+        // O status não pode interromper o carregamento caso algum elemento
+        // ainda não esteja disponível durante o refresh.
+        if (!el || !text) {
+          console.warn('Elementos de status de sincronização não encontrados.');
+          return;
+        }
+
         el.className = 'sync-status';
-        if (status === 'synced') { el.classList.add('synced');
-          text.textContent = msg || 'Sincronizado ✓'; } else if (status === 'error') { el.classList.add('error');
-          text.textContent = msg || 'Erro na sincronização'; } else { text.textContent = msg || 'Sincronizando...'; }
+        if (status === 'synced') {
+          el.classList.add('synced');
+          text.textContent = msg || 'Sincronizado ✓';
+        } else if (status === 'error') {
+          el.classList.add('error');
+          text.textContent = msg || 'Erro na sincronização';
+        } else {
+          text.textContent = msg || 'Sincronizando...';
+        }
       }
 
       async function syncToSheets() {
