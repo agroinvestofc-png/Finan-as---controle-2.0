@@ -3764,8 +3764,15 @@
       }
 
 
-      document.getElementById('googleLoginBtn').addEventListener('click', handleAuthClick);
-      document.getElementById('configUrl').textContent = window.location.origin;
+      const googleLoginButton = document.getElementById('googleLoginBtn');
+      if (googleLoginButton) {
+        googleLoginButton.addEventListener('click', handleAuthClick);
+      }
+
+      const configUrlElement = document.getElementById('configUrl');
+      if (configUrlElement) {
+        configUrlElement.textContent = window.location.origin;
+      }
 
 
       // ─── Botão CSV ───
