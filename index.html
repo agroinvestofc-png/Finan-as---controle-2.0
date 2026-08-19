@@ -3233,8 +3233,28 @@
       });
 
       document.getElementById('forcarSyncBtn').addEventListener('click', function() {
-        if (useCloud) syncToSheets();
-        else showToast('Modo local ativo', 'info');
+        if (!useCloud) {
+          showToast('Modo local ativo', 'info');
+          return;
+        }
+
+        if (!isSignedIn) {
+          if (!tokenClient) {
+            setSyncStatus('error', 'Autenticação ainda carregando');
+            return;
+          }
+
+          setSyncStatus('loading', 'Clique para autorizar a sincronização...');
+          try {
+            tokenClient.requestAccessToken({ prompt: 'consent' });
+          } catch (error) {
+            console.error('Erro ao solicitar autorização:', error);
+            setSyncStatus('error', 'Não foi possível abrir o login Google');
+          }
+          return;
+        }
+
+        syncToSheets();
       });
 
       // ─── Add buttons ───
@@ -3708,26 +3728,9 @@
 
         if (loginButton) loginButton.disabled = false;
 
-        if (
-          !sessionRestoreStarted &&
-          !isSignedIn &&
-          localStorage.getItem(SESSION_KEY) === '1'
-        ) {
-          sessionRestoreStarted = true;
-
-          // Aguarda o ciclo atual terminar para garantir que o tokenClient esteja pronto
-          setTimeout(() => {
-            if (!tokenClient || isSignedIn) return;
-
-            try {
-              tokenClient.requestAccessToken({ prompt: '' });
-            } catch (error) {
-              console.error('Erro ao restaurar sessão:', error);
-              localStorage.removeItem(SESSION_KEY);
-              setLoginStatus('Faça login novamente com o Google.');
-            }
-          }, 0);
-        }
+        // Não solicite token automaticamente após o refresh.
+        // Isso evita popup bloqueado pelo navegador. A autorização será
+        // solicitada somente por uma ação explícita do usuário.
       }
 
       const gapiScript = document.createElement('script' );
